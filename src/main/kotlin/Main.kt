@@ -123,7 +123,9 @@ class MainFrame : JFrame() {
                 val tempDir = File(System.getProperty("java.io.tmpdir") + File.separator + "VulpesInstaller")
                 tempDir.deleteRecursively()
                 tempDir.mkdir()
-                progressLabel.text = "Downloading Repacker..."
+                progressLabel.text = "Downloading Deobfuscator..."
+                //
+                "buildscript {\nrepositories {\nmaven {\nurl \"https://repo.spongepowered.org/repository/maven-public/\"\n}\n}\ndependencies {\nclasspath \"org.spongepowered:vanillagradle:0.2.1-SNAPSHOT\"\n}\n}\nplugins {\nid 'java'\n}\napply plugin: \"org.spongepowered.gradle.vanilla\"\ngroup = 'com.example'\nversion = \"1.0.0\"\nrepositories {\nmavenCentral()\nmaven { url = \"https://repo.spongepowered.org/maven/\" }\nmaven { url = \"https://maven.minecraftforge.net/\" }\nmaven { url = \"https://maven.enaium.cn\" }\nmaven { url = 'https://jitpack.io' }\n}\ndependencies {\nimplementation 'com.github.VulpesMC:VulpesStandardLibrary:main-SNAPSHOT'\nimplementation 'com.github.VulpesMC:VulpesLoader:main-SNAPSHOT'\n}\nminecraft {\nversion(\""+minecraftVersionBox.text+"\")\n}"
                 try {
                     BufferedInputStream(URL("https://github.com/Fox2Code/Repacker/releases/download/v1.4.0/Repacker-1.4.0.jar").openStream()).use { `in` ->
                         FileOutputStream(tempDir.absolutePath + File.separator + "Repacker-1.4.0.jar").use { fileOutputStream ->
@@ -215,7 +217,7 @@ class MainFrame : JFrame() {
                 progressLabel.text = "Creating Manifest JSON..."
                 var jsonObj = Gson().fromJson(tempDir.resolve(minecraftVersionBox.text+".json").readText(), JsonObject::class.java)
                 jsonObj.remove("downloads")
-                jsonObj.add("mainClass",JsonPrimitive("net.minecraft.client.main.Main"))
+                jsonObj.add("mainClass",JsonPrimitive("net.minecraft.launchwrapper.Launch"))
                 jsonObj.add("id",JsonPrimitive(jsonObj.get("id").asString!!+"-vulpes"))
                 ver.resolve(minecraftVersionBox.text+"-vulpes.json").writeText(Gson().toJson(jsonObj))
                 progressLabel.text = "Moving Deobfuscated Minecraft JAR to Version Directory..."
