@@ -1,0 +1,41 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.9.0'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+    id 'application'
+}
+
+group = 'sh.talonfox'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    shadow
+    implementation.extendsFrom shadow
+}
+
+dependencies {
+    testImplementation 'org.jetbrains.kotlin:kotlin-test'
+    shadow "com.formdev:flatlaf:3.1.1"
+    implementation "com.formdev:flatlaf:3.1.1"
+    shadow 'com.google.code.gson:gson:2.10'
+    implementation 'com.google.code.gson:gson:2.10'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+kotlin {
+    jvmToolchain(8)
+}
+
+application {
+    mainClassName = 'MainKt'
+}
+
+shadowJar {
+
+}
