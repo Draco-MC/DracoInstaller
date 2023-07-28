@@ -2,7 +2,6 @@ import com.formdev.flatlaf.FlatDarculaLaf
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonPrimitive
-import org.w3c.dom.Element
 import java.awt.*
 import java.awt.event.ActionEvent
 import java.awt.event.WindowAdapter
@@ -15,10 +14,6 @@ import java.net.URL
 import java.util.*
 import javax.imageio.ImageIO
 import javax.swing.*
-import javax.swing.text.Document
-import javax.xml.XMLConstants
-import javax.xml.parsers.DocumentBuilder
-import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.system.exitProcess
 
 
@@ -123,40 +118,33 @@ class MainFrame : JFrame() {
                 val tempDir = File(System.getProperty("java.io.tmpdir") + File.separator + "VulpesInstaller")
                 tempDir.deleteRecursively()
                 tempDir.mkdir()
-                progressLabel.text = "Downloading Deobfuscator..."
-                //
-                "buildscript {\nrepositories {\nmaven {\nurl \"https://repo.spongepowered.org/repository/maven-public/\"\n}\n}\ndependencies {\nclasspath \"org.spongepowered:vanillagradle:0.2.1-SNAPSHOT\"\n}\n}\nplugins {\nid 'java'\n}\napply plugin: \"org.spongepowered.gradle.vanilla\"\ngroup = 'com.example'\nversion = \"1.0.0\"\nrepositories {\nmavenCentral()\nmaven { url = \"https://repo.spongepowered.org/maven/\" }\nmaven { url = \"https://maven.minecraftforge.net/\" }\nmaven { url = \"https://maven.enaium.cn\" }\nmaven { url = 'https://jitpack.io' }\n}\ndependencies {\nimplementation 'com.github.VulpesMC:VulpesStandardLibrary:main-SNAPSHOT'\nimplementation 'com.github.VulpesMC:VulpesLoader:main-SNAPSHOT'\n}\nminecraft {\nversion(\""+minecraftVersionBox.text+"\")\n}"
-                try {
-                    BufferedInputStream(URL("https://github.com/Fox2Code/Repacker/releases/download/v1.4.0/Repacker-1.4.0.jar").openStream()).use { `in` ->
-                        FileOutputStream(tempDir.absolutePath + File.separator + "Repacker-1.4.0.jar").use { fileOutputStream ->
-                            val dataBuffer = ByteArray(1024)
-                            var bytesRead: Int
-                            while (`in`.read(dataBuffer, 0, 1024).also { bytesRead = it } != -1) {
-                                fileOutputStream.write(dataBuffer, 0, bytesRead)
-                            }
-                        }
-                    }
-                } catch (e: IOException) {
-                    tempDir.deleteRecursively()
-                    abortInstall(e.toString())
-                    return@Thread
-                }
-                progressLabel.text = "Deobfuscating Minecraft..."
+                progressLabel.text = "Preparing for Deobfuscation..."
+                tempDir.resolve("gradlew").writeBytes(javaClass.classLoader.getResourceAsStream("gradlew")?.readBytes()!!)
+                tempDir.resolve("gradlew.bat").writeBytes(javaClass.classLoader.getResourceAsStream("gradlew.bat")?.readBytes()!!)
+                tempDir.resolve("gradle").resolve("wrapper").mkdirs()
+                tempDir.resolve("gradle").resolve("wrapper").resolve("gradle-wrapper.properties").writeBytes(javaClass.classLoader.getResourceAsStream("gradle-wrapper.properties")?.readBytes()!!)
+                tempDir.resolve("gradle").resolve("wrapper").resolve("gradle-wrapper.jar").writeBytes(javaClass.classLoader.getResourceAsStream("gradle-wrapper")?.readBytes()!!)
+                tempDir.resolve("build.gradle").writeText("buildscript {\nrepositories {\nmaven { url \"https://repo.spongepowered.org/repository/maven-public/\" }\n}\ndependencies {\nclasspath \"org.spongepowered:vanillagradle:0.2.1-SNAPSHOT\"\n}\n}\nplugins {\nid 'java'\n}\napply plugin: \"org.spongepowered.gradle.vanilla\"\ngroup = \"org.example\"\nversion = \"1.0-SNAPSHOT\"\nminecraft {\nversion(\""+minecraftVersionBox.text+"\")\n}")
+                progressLabel.text = "Deobfuscating Minecraft... (this may take a few minutes)"
                 if(JOptionPane.showConfirmDialog(this,"Please accept the following copyright notice to continue:\n\n(c) 2020 Microsoft Corporation. These mappings are provided \"as-is\" and you bear the risk of using them. You may copy and use the mappings for development purposes, but you may not redistribute the mappings complete and unmodified. Microsoft makes no warranties, express or implied, with respect to the mappings provided here.  Use and modification of this document or the source code (in any form) of Minecraft: Java Edition is governed by the Minecraft End User License Agreement available at https://account.mojang.com/documents/minecraft_eula.","Deobfuscation Notice",JOptionPane.OK_CANCEL_OPTION) == JOptionPane.CANCEL_OPTION) {
                     abortInstall("User denied the copyright notice for the Mojang Mappings\nCannot continue");
                     return@Thread
                 }
                 try {
-                    val javaHome = System.getProperty("java.home")
-                    val javaBin = javaHome +
-                            File.separator + "bin" +
-                            File.separator + "java"
-                    val pb = ProcessBuilder(javaBin, "-jar", tempDir.absolutePath + File.separator + "Repacker-1.4.0.jar", tempDir.absolutePath, minecraftVersionBox.text)
+                    val pb = if(os.contains("win"))
+                        ProcessBuilder("cmd.exe","/C",tempDir.resolve("gradlew.bat").absolutePath+" build")
+                    else
+                        ProcessBuilder("bash","-c",tempDir.resolve("gradlew").absolutePath+" build")
+                    pb.directory(tempDir)
+                    pb.redirectOutput(File("out.log"))
+                    pb.redirectError(File("err.log"))
                     if(pb.start().waitFor() != 0) {
                         tempDir.deleteRecursively()
-                        abortInstall("Repacker exited with non-zero value!")
+                        abortInstall("Gradle exited with non-zero value!")
                         return@Thread
                     }
+                    File(System.getProperty("user.home")).resolve(".gradle").resolve("caches").resolve("VanillaGradle").resolve("v2").resolve("jars").resolve("net").resolve("minecraft").resolve("client").resolve(minecraftVersionBox.text).resolve("client-"+minecraftVersionBox.text+".jar").copyTo(tempDir.resolve("minecraft-"+minecraftVersionBox.text+"-remapped.jar"))
+                    File(System.getProperty("user.home")).resolve(".gradle").resolve("caches").resolve("VanillaGradle").resolve("v2").resolve("manifests").resolve("versions").resolve(minecraftVersionBox.text+".json").copyTo(tempDir.resolve(minecraftVersionBox.text+".json"))
                 } catch(e: Exception) {
                     tempDir.deleteRecursively()
                     abortInstall(e.toString())
