@@ -2,14 +2,19 @@ import com.formdev.flatlaf.FlatDarculaLaf
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonPrimitive
+import net.fabricmc.mappingio.MappedElementKind
+import net.fabricmc.mappingio.extras.MappingTreeRemapper
+import net.fabricmc.mappingio.format.proguard.ProGuardFileReader
+import net.fabricmc.mappingio.format.tiny.Tiny1FileReader
+import net.fabricmc.mappingio.format.tiny.Tiny1FileWriter
+import net.fabricmc.mappingio.format.tiny.Tiny2FileReader
+import net.fabricmc.mappingio.format.tiny.Tiny2FileWriter
+import net.fabricmc.mappingio.tree.MemoryMappingTree
 import java.awt.*
 import java.awt.event.ActionEvent
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
-import java.io.BufferedInputStream
-import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
+import java.io.*
 import java.net.URL
 import java.util.*
 import javax.imageio.ImageIO
@@ -113,38 +118,95 @@ class MainFrame : JFrame() {
                     abortInstall("You don't appear to have the Minecraft Launcher installed (or you've never opened it) please open it and install the version you want to install Vulpes Loader to")
                     return@Thread
                 }
-                progressLabel.text = "Searching for Minecraft Version..."
                 progressLabel.text = "Creating Temporary Download Directory..."
                 val tempDir = File(System.getProperty("java.io.tmpdir") + File.separator + "VulpesInstaller")
                 tempDir.deleteRecursively()
                 tempDir.mkdir()
-                progressLabel.text = "Preparing for Deobfuscation..."
-                tempDir.resolve("gradlew").writeBytes(javaClass.classLoader.getResourceAsStream("gradlew")?.readBytes()!!)
-                tempDir.resolve("gradlew.bat").writeBytes(javaClass.classLoader.getResourceAsStream("gradlew.bat")?.readBytes()!!)
-                tempDir.resolve("gradle").resolve("wrapper").mkdirs()
-                tempDir.resolve("gradle").resolve("wrapper").resolve("gradle-wrapper.properties").writeBytes(javaClass.classLoader.getResourceAsStream("gradle-wrapper.properties")?.readBytes()!!)
-                tempDir.resolve("gradle").resolve("wrapper").resolve("gradle-wrapper.jar").writeBytes(javaClass.classLoader.getResourceAsStream("gradle-wrapper")?.readBytes()!!)
-                tempDir.resolve("build.gradle").writeText("buildscript {\nrepositories {\nmaven { url \"https://repo.spongepowered.org/repository/maven-public/\" }\n}\ndependencies {\nclasspath \"org.spongepowered:vanillagradle:0.2.1-SNAPSHOT\"\n}\n}\nplugins {\nid 'java'\n}\napply plugin: \"org.spongepowered.gradle.vanilla\"\ngroup = \"org.example\"\nversion = \"1.0-SNAPSHOT\"\nminecraft {\nversion(\""+minecraftVersionBox.text+"\")\n}")
-                progressLabel.text = "Deobfuscating Minecraft... (this may take a few minutes)"
+                progressLabel.text = "Convert Mojmap from Proguard to Tiny Mappings..."
                 if(JOptionPane.showConfirmDialog(this,"Please accept the following copyright notice to continue:\n\n(c) 2020 Microsoft Corporation. These mappings are provided \"as-is\" and you bear the risk of using them. You may copy and use the mappings for development purposes, but you may not redistribute the mappings complete and unmodified. Microsoft makes no warranties, express or implied, with respect to the mappings provided here.  Use and modification of this document or the source code (in any form) of Minecraft: Java Edition is governed by the Minecraft End User License Agreement available at https://account.mojang.com/documents/minecraft_eula.","Deobfuscation Notice",JOptionPane.OK_CANCEL_OPTION) == JOptionPane.CANCEL_OPTION) {
                     abortInstall("User denied the copyright notice for the Mojang Mappings\nCannot continue");
                     return@Thread
                 }
                 try {
-                    val pb = if(os.contains("win"))
-                        ProcessBuilder("cmd.exe","/C",tempDir.resolve("gradlew.bat").absolutePath+" decompile")
-                    else
-                        ProcessBuilder("bash","-c",tempDir.resolve("gradlew").absolutePath+" decompile")
+                    BufferedInputStream(URL("https://launchermeta.mojang.com/mc/game/version_manifest.json").openStream()).use { `in` ->
+                        FileOutputStream(tempDir.absolutePath + File.separator + "version_manifest.json").use { fileOutputStream ->
+                            val dataBuffer = ByteArray(1024)
+                            var bytesRead: Int
+                            while (`in`.read(dataBuffer, 0, 1024).also { bytesRead = it } != -1) {
+                                fileOutputStream.write(dataBuffer, 0, bytesRead)
+                            }
+                        }
+                    }
+                    var jsonObj = Gson().fromJson(tempDir.resolve("version_manifest.json").readText(), JsonObject::class.java)
+                    var found = false
+                    jsonObj.get("versions").asJsonArray.forEach {
+                        if(it.asJsonObject.get("id").asString.equals(minecraftVersionBox.text)) {
+                            found = true
+                            BufferedInputStream(URL(it.asJsonObject.get("url").asString).openStream()).use { `in` ->
+                                FileOutputStream(tempDir.absolutePath + File.separator + "minecraft.json").use { fileOutputStream ->
+                                    val dataBuffer = ByteArray(1024)
+                                    var bytesRead: Int
+                                    while (`in`.read(dataBuffer, 0, 1024).also { bytesRead = it } != -1) {
+                                        fileOutputStream.write(dataBuffer, 0, bytesRead)
+                                    }
+                                }
+                            }
+                            var versionJson = Gson().fromJson(tempDir.resolve("minecraft.json").readText(), JsonObject::class.java)
+                            val mappingsURL = versionJson.get("downloads").asJsonObject.get("client_mappings").asJsonObject.get("url").asString
+                            val clientURL = versionJson.get("downloads").asJsonObject.get("client").asJsonObject.get("url").asString
+                            BufferedInputStream(URL(mappingsURL).openStream()).use { `in` ->
+                                FileOutputStream(tempDir.absolutePath + File.separator + "mappings.txt").use { fileOutputStream ->
+                                    val dataBuffer = ByteArray(1024)
+                                    var bytesRead: Int
+                                    while (`in`.read(dataBuffer, 0, 1024).also { bytesRead = it } != -1) {
+                                        fileOutputStream.write(dataBuffer, 0, bytesRead)
+                                    }
+                                }
+                            }
+                            BufferedInputStream(URL(clientURL).openStream()).use { `in` ->
+                                FileOutputStream(tempDir.absolutePath + File.separator + minecraftVersionBox.text + ".jar").use { fileOutputStream ->
+                                    val dataBuffer = ByteArray(1024)
+                                    var bytesRead: Int
+                                    while (`in`.read(dataBuffer, 0, 1024).also { bytesRead = it } != -1) {
+                                        fileOutputStream.write(dataBuffer, 0, bytesRead)
+                                    }
+                                }
+                            }
+                            val tree = MemoryMappingTree()
+                            ProGuardFileReader.read(FileReader(tempDir.absolutePath + File.separator + "mappings.txt"), "mojmap", "notch", tree)
+                            tree.accept(Tiny1FileWriter(OutputStreamWriter(FileOutputStream(tempDir.absolutePath + File.separator + "mappings.tiny"))))
+                        }
+                    }
+                    if(!found) {
+                        tempDir.deleteRecursively()
+                        abortInstall("Couldn't download that version of Minecraft!")
+                        return@Thread
+                    }
+                } catch (e: Exception) {
+                    tempDir.deleteRecursively()
+                    abortInstall(e.toString())
+                    return@Thread
+                }
+                progressLabel.text = "Deobfuscating Minecraft..."
+                try {
+                    BufferedInputStream(URL("https://maven.fabricmc.net/net/fabricmc/tiny-remapper/0.9.0/tiny-remapper-0.9.0-fat.jar").openStream()).use { `in` ->
+                        FileOutputStream(tempDir.absolutePath + File.separator + "tiny-remapper.jar").use { fileOutputStream ->
+                            val dataBuffer = ByteArray(1024)
+                            var bytesRead: Int
+                            while (`in`.read(dataBuffer, 0, 1024).also { bytesRead = it } != -1) {
+                                fileOutputStream.write(dataBuffer, 0, bytesRead)
+                            }
+                        }
+                    }
+                    val pb = ProcessBuilder("java", "-jar", tempDir.absolutePath + File.separator + "tiny-remapper.jar", tempDir.absolutePath + File.separator + minecraftVersionBox.text + ".jar", tempDir.absolutePath + File.separator + minecraftVersionBox.text + "-deobf.jar", tempDir.absolutePath + File.separator + "mappings.tiny", "notch", "mojmap")
                     pb.directory(tempDir)
                     pb.redirectOutput(File("out.log"))
                     pb.redirectError(File("err.log"))
                     if(pb.start().waitFor() != 0) {
                         tempDir.deleteRecursively()
-                        abortInstall("Gradle exited with non-zero value!")
+                        abortInstall("Tiny Remapper exited with non-zero value!")
                         return@Thread
                     }
-                    File(System.getProperty("user.home")).resolve(".gradle").resolve("caches").resolve("VanillaGradle").resolve("v2").resolve("jars").resolve("net").resolve("minecraft").resolve("client").resolve(minecraftVersionBox.text).resolve("client-"+minecraftVersionBox.text+".jar").copyTo(tempDir.resolve("minecraft-"+minecraftVersionBox.text+"-remapped.jar"))
-                    File(System.getProperty("user.home")).resolve(".gradle").resolve("caches").resolve("VanillaGradle").resolve("v2").resolve("manifests").resolve("versions").resolve(minecraftVersionBox.text+".json").copyTo(tempDir.resolve(minecraftVersionBox.text+".json"))
                 } catch(e: Exception) {
                     tempDir.deleteRecursively()
                     abortInstall(e.toString())
@@ -178,6 +240,7 @@ class MainFrame : JFrame() {
                         abortInstall("Java SDK's \"jar\" exited with non-zero value!")
                         return@Thread
                     }
+                    File(tempDir.absolutePath + File.separator + "mappings.tiny").copyTo(File(tempDir.absolutePath + File.separator + "VulpesLoader" + File.separator + "mappings.tiny"))
                 } catch(e: Exception) {
                     tempDir.deleteRecursively()
                     abortInstall(e.toString())
@@ -186,7 +249,7 @@ class MainFrame : JFrame() {
                 progressLabel.text = "Adding VulpesLoader Classes to Deobfuscated Minecraft JAR..."
                 try {
                     val dir = File(tempDir.absolutePath + File.separator + "VulpesLoader")
-                    val pb = ProcessBuilder("jar", "uf", ".."+File.separator+"minecraft-"+minecraftVersionBox.text+"-remapped.jar", ".")
+                    val pb = ProcessBuilder("jar", "uf", ".."+File.separator+minecraftVersionBox.text+"-deobf.jar", ".")
                     pb.directory(dir)
                     if(pb.start().waitFor() != 0) {
                         tempDir.deleteRecursively()
@@ -203,13 +266,13 @@ class MainFrame : JFrame() {
                 ver.deleteRecursively()
                 ver.mkdir()
                 progressLabel.text = "Creating Manifest JSON..."
-                var jsonObj = Gson().fromJson(tempDir.resolve(minecraftVersionBox.text+".json").readText(), JsonObject::class.java)
+                var jsonObj = Gson().fromJson(tempDir.resolve("minecraft.json").readText(), JsonObject::class.java)
                 jsonObj.remove("downloads")
                 jsonObj.add("mainClass",JsonPrimitive("net.minecraft.launchwrapper.Launch"))
                 jsonObj.add("id",JsonPrimitive(jsonObj.get("id").asString!!+"-vulpes"))
                 ver.resolve(minecraftVersionBox.text+"-vulpes.json").writeText(Gson().toJson(jsonObj))
                 progressLabel.text = "Moving Deobfuscated Minecraft JAR to Version Directory..."
-                tempDir.resolve("minecraft-"+minecraftVersionBox.text+"-remapped.jar").renameTo(ver.resolve(minecraftVersionBox.text+"-vulpes.jar"))
+                tempDir.resolve(minecraftVersionBox.text+"-deobf.jar").renameTo(ver.resolve(minecraftVersionBox.text+"-vulpes.jar"))
                 progressLabel.text = "Cleaning up..."
                 tempDir.deleteRecursively()
                 progressLabel.text = "Installation Successful!"
