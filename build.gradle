@@ -4,7 +4,7 @@ plugins {
     id 'application'
 }
 
-group = 'sh.talonfox'
+group = 'sh.talonfloof'
 version = '1.0-SNAPSHOT'
 
 repositories {
