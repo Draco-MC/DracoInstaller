@@ -240,7 +240,6 @@ class MainFrame : JFrame() {
                         abortInstall("Java SDK's \"jar\" exited with non-zero value!")
                         return@Thread
                     }
-                    File(tempDir.absolutePath + File.separator + "mappings.tiny").copyTo(File(tempDir.absolutePath + File.separator + "DracoLoader" + File.separator + "mappings.tiny"))
                 } catch(e: Exception) {
                     tempDir.deleteRecursively()
                     abortInstall(e.toString())
