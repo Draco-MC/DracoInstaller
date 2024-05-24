@@ -37,7 +37,7 @@ class MainFrame : JFrame() {
         setTitle("Draco Mod Loader Installer")
         setSize(500, 300)
         try {
-            val stream = (URL("https://gist.githubusercontent.com/TalonFloof/e900366b17ebaf981a02d27f09bfd12c/raw/135269b397ae4fa50434eab2daf20a420a72fe33/version_manifest.json").content as InputStream)
+            val stream = (URL("https://gist.githubusercontent.com/TalonFloof/e900366b17ebaf981a02d27f09bfd12c/raw/version_manifest.json").content as InputStream)
             manifest = Gson().fromJson(String(stream.readBytes()),JsonObject::class.java)
             stream.close()
         } catch (e: IOException) {
