@@ -178,12 +178,7 @@ class MainFrame : JFrame() {
                 val tempDir = File(System.getProperty("java.io.tmpdir") + File.separator + "VulpesInstaller")
                 tempDir.deleteRecursively()
                 tempDir.mkdir()
-                progressLabel.text = "Convert Mojmap from Proguard to Tiny Mappings..."
-                playQuestionSound()
-                if(JOptionPane.showConfirmDialog(this,"Please accept the following copyright notice to continue:\n\n(c) 2020 Microsoft Corporation. These mappings are provided \"as-is\" and you bear the risk of using them. You may copy and use the mappings for development purposes, but you may not redistribute the mappings complete and unmodified. Microsoft makes no warranties, express or implied, with respect to the mappings provided here.  Use and modification of this document or the source code (in any form) of Minecraft: Java Edition is governed by the Minecraft End User License Agreement available at https://account.mojang.com/documents/minecraft_eula.","Deobfuscation Notice",JOptionPane.OK_CANCEL_OPTION) == JOptionPane.CANCEL_OPTION) {
-                    abortInstall("User denied the copyright notice for the Mojang Mappings\nCannot continue");
-                    return@Thread
-                }
+                progressLabel.text = "Finding Mapping Type..."
                 try {
                     BufferedInputStream(URL("https://launchermeta.mojang.com/mc/game/version_manifest.json").openStream()).use { `in` ->
                         FileOutputStream(tempDir.absolutePath + File.separator + "version_manifest.json").use { fileOutputStream ->
@@ -209,17 +204,7 @@ class MainFrame : JFrame() {
                                 }
                             }
                             var versionJson = Gson().fromJson(tempDir.resolve("minecraft.json").readText(), JsonObject::class.java)
-                            val mappingsURL = versionJson.get("downloads").asJsonObject.get("client_mappings").asJsonObject.get("url").asString
                             val clientURL = versionJson.get("downloads").asJsonObject.get("client").asJsonObject.get("url").asString
-                            BufferedInputStream(URL(mappingsURL).openStream()).use { `in` ->
-                                FileOutputStream(tempDir.absolutePath + File.separator + "mappings.txt").use { fileOutputStream ->
-                                    val dataBuffer = ByteArray(1024)
-                                    var bytesRead: Int
-                                    while (`in`.read(dataBuffer, 0, 1024).also { bytesRead = it } != -1) {
-                                        fileOutputStream.write(dataBuffer, 0, bytesRead)
-                                    }
-                                }
-                            }
                             BufferedInputStream(URL(clientURL).openStream()).use { `in` ->
                                 FileOutputStream(tempDir.absolutePath + File.separator + minecraftVersionBox.text + ".jar").use { fileOutputStream ->
                                     val dataBuffer = ByteArray(1024)
@@ -229,9 +214,47 @@ class MainFrame : JFrame() {
                                     }
                                 }
                             }
-                            val tree = MemoryMappingTree()
-                            ProGuardFileReader.read(FileReader(tempDir.absolutePath + File.separator + "mappings.txt"), "mojmap", "notch", tree)
-                            tree.accept(Tiny2FileWriter(OutputStreamWriter(FileOutputStream(tempDir.absolutePath + File.separator + "mappings.tiny")), false))
+                            if(versionJson.get("downloads").asJsonObject.get("client_mappings") != null) {
+                                val mappingsURL = versionJson.get("downloads").asJsonObject.get("client_mappings").asJsonObject.get("url")
+                                BufferedInputStream(URL(mappingsURL.asString).openStream()).use { `in` ->
+                                    FileOutputStream(tempDir.absolutePath + File.separator + "mappings.txt").use { fileOutputStream ->
+                                        val dataBuffer = ByteArray(1024)
+                                        var bytesRead: Int
+                                        while (`in`.read(dataBuffer, 0, 1024).also { bytesRead = it } != -1) {
+                                            fileOutputStream.write(dataBuffer, 0, bytesRead)
+                                        }
+                                    }
+                                }
+                                progressLabel.text = "Convert Mojmap from Proguard to Tiny Mappings..."
+                                playQuestionSound()
+                                if (JOptionPane.showConfirmDialog(
+                                        this,
+                                        "Please accept the following copyright notice to continue:\n\n(c) 2020 Microsoft Corporation. These mappings are provided \"as-is\" and you bear the risk of using them. You may copy and use the mappings for development purposes, but you may not redistribute the mappings complete and unmodified. Microsoft makes no warranties, express or implied, with respect to the mappings provided here.  Use and modification of this document or the source code (in any form) of Minecraft: Java Edition is governed by the Minecraft End User License Agreement available at https://account.mojang.com/documents/minecraft_eula.",
+                                        "Deobfuscation Notice",
+                                        JOptionPane.OK_CANCEL_OPTION
+                                    ) == JOptionPane.CANCEL_OPTION
+                                ) {
+                                    abortInstall("User denied the copyright notice for the Mojang Mappings\nCannot continue");
+                                    return@Thread
+                                }
+                                val tree = MemoryMappingTree()
+                                ProGuardFileReader.read(
+                                    FileReader(tempDir.absolutePath + File.separator + "mappings.txt"),
+                                    "mojmap",
+                                    "notch",
+                                    tree
+                                )
+                                tree.accept(
+                                    Tiny2FileWriter(
+                                        OutputStreamWriter(FileOutputStream(tempDir.absolutePath + File.separator + "mappings.tiny")),
+                                        false
+                                    )
+                                )
+                            } else {
+                                tempDir.deleteRecursively()
+                                abortInstall("This version of Minecraft does not have Mojang Mappings available for it, only versions 1.14.4 or later support Mojang Mappings")
+                                return@Thread
+                            }
                         }
                     }
                     if(!found) {
