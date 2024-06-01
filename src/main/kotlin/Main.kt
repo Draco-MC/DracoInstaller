@@ -313,8 +313,6 @@ class MainFrame : JFrame() {
                     }
                     val pb = ProcessBuilder("java", "-jar", tempDir.absolutePath + File.separator + "tiny-remapper.jar", tempDir.absolutePath + File.separator + minecraftVersionBox.text + ".jar", tempDir.absolutePath + File.separator + minecraftVersionBox.text + "-deobf.jar", tempDir.absolutePath + File.separator + "mappings.tiny", "notch", "mojmap")
                     pb.directory(tempDir)
-                    pb.redirectOutput(File("out.log"))
-                    pb.redirectError(File("err.log"))
                     if(pb.start().waitFor() != 0) {
                         tempDir.deleteRecursively()
                         abortInstall("Tiny Remapper exited with non-zero value!")
@@ -514,7 +512,7 @@ class MainFrame : JFrame() {
         loaderVersionBox.isEnabled = true
         progressBar.isIndeterminate = false
         launcherType.isEnabled = true
-        progressLabel.text = "To start, select a Vulpes version and a Minecraft version, then press install"
+        progressLabel.text = "To start, select a Draco version and a Minecraft version, then press install"
     }
 }
 
