@@ -302,7 +302,7 @@ class MainFrame : JFrame() {
                 }
                 progressLabel.text = "Deobfuscating Minecraft..."
                 try {
-                    BufferedInputStream(URL("https://maven.fabricmc.net/net/fabricmc/tiny-remapper/0.9.0/tiny-remapper-0.9.0-fat.jar").openStream()).use { `in` ->
+                    BufferedInputStream(URL("https://maven.fabricmc.net/net/fabricmc/tiny-remapper/0.11.1/tiny-remapper-0.11.1-fat.jar").openStream()).use { `in` ->
                         FileOutputStream(tempDir.absolutePath + File.separator + "tiny-remapper.jar").use { fileOutputStream ->
                             val dataBuffer = ByteArray(1024)
                             var bytesRead: Int
